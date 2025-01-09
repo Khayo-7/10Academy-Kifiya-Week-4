@@ -1,5 +1,4 @@
 import os
-import logging
 import pandas as pd
 from scripts.utils.logger import setup_logger
 
@@ -24,25 +23,11 @@ def load_csv(file_path: str, sep=',') -> pd.DataFrame:
         # dataframe = pd.read_csv(file_path, sep='|')
         # dataframe = pd.read_csv(file_path, sep='\t')
         logger.info(f"Loaded data from {file_path}, shape: {data.shape}")
+
         return data
     except Exception as e:
         logger.error(f"Error loading {file_path}: {e}")
         return None
-
-def load_train_test_store(train_path, test_path, store_path):
-    """
-    Load training, testing, and store data.
-    Args:
-        train_path (str): Path to train.csv.
-        test_path (str): Path to test.csv.
-        store_path (str): Path to store.csv.
-    Returns:
-        Tuple[pd.DataFrame]: (train, test, store) DataFrames.
-    """
-    train = load_csv(train_path)
-    test = load_csv(test_path)
-    store = load_csv(store_path)
-    return train, test, store
 
 def summarize_data(data: pd.DataFrame):
     """Prints summary statistics and info about the dataset."""
@@ -75,5 +60,3 @@ def save_csv(dataframe, output_path):
         logger.info(f"Data saved to {output_path} successfully.")
     except Exception as e:
         logger.error(f"Error saving data to {output_path}: {e}")
-
-
