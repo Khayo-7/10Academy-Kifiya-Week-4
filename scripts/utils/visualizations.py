@@ -1,4 +1,5 @@
 import holidays
+import itertools
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -657,4 +658,46 @@ def plot_sales_by_holiday(data, country='US', date_column='Date', sales_column='
     # plt.legend()
     plt.grid()
     plt.tight_layout()
+    plt.show()
+
+
+# Plot Actual vs Predicted
+def plot_actual_vs_predicted(y_true, y_pred, dataset_type="Dataset"):
+    plt.figure(figsize=(14, 7))
+    plt.scatter(y_true, y_pred, alpha=0.5, color='blue')
+    plt.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], 'r--', lw=2)
+    plt.title(f'{dataset_type}: Actual vs Predicted')
+    plt.xlabel('Actual')
+    plt.ylabel('Predicted')
+    plt.grid(True)
+    plt.show()
+
+def plot_training_history(history):
+    """
+    Plot training and validation loss/metrics.
+
+    Args:
+    - history: Keras training history object.
+    """
+    plt.figure(figsize=(14, 7))
+    plt.plot(history.history['loss'], label='Training Loss')
+    plt.plot(history.history['val_loss'], label='Validation Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.title('LSTM Training vs. Validation Loss')
+    plt.legend()
+    plt.show()
+
+def plot_feature_importances(data, importances):
+        
+    indices = np.argsort(importances)
+    features_ranked=[data.columns[indices[f]] for f in range(data.shape[1])]
+
+    plt.figure(figsize=(14, 7))
+    plt.title("Feature importances")
+    plt.barh(range(data.shape[1]), importances[indices],
+                color=[next(itertools.cycle(sns.color_palette()))], align="center")
+    plt.yticks(range(data.shape[1]), features_ranked)
+    plt.ylabel('Features')
+    plt.ylim([-1, data.shape[1]])
     plt.show()

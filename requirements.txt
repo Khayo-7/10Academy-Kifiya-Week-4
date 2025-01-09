@@ -2,4 +2,9 @@ pandas
 matplotlib
 seaborn
 holiday
+xgboost
+lightgbm
+sklearn
+scikit-learn
+tensorflow
 statsmodels

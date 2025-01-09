@@ -5,30 +5,10 @@ import pandas as pd
 from ast import Add
 from pandas.tseries.offsets import MonthBegin
 from statsmodels.tsa.seasonal import seasonal_decompose
-from sklearn.preprocessing import LabelEncoder, StandardScaler
 from scripts.utils.logger import setup_logger
 
 # Setup logger for feature_engineering.py
 logger = setup_logger("feature_engineering")
-
-def handle_missing_data(data):
-    """Handle missing values in the data."""
-    data = data.copy()
-    logger.info("Starting to handle missing data...")
-    # Replace missing CompetitionDistance with a large value (assumed no competition nearby)
-    data['CompetitionDistance'] = data['CompetitionDistance'].fillna(data['CompetitionDistance'].max() * 2)
-
-    # Replace missing competition open dates with default values
-    data['CompetitionOpenSinceYear'] = data['CompetitionOpenSinceYear'].fillna(data['CompetitionOpenSinceYear'].median())
-    data['CompetitionOpenSinceMonth'] = data['CompetitionOpenSinceMonth'].fillna(1)
-
-    # Replace missing Promo2 information with defaults
-    data['Promo2SinceYear'] = data['Promo2SinceYear'].fillna(0)
-    data['Promo2SinceWeek'] = data['Promo2SinceWeek'].fillna(0)
-    data['PromoInterval'] = data['PromoInterval'].fillna('')
-
-    logger.info("Missing data handled successfully.")
-    return data
 
 def extract_date_features(data, date_column='Date'):
     """Extract useful features from the Date column."""
@@ -41,7 +21,7 @@ def extract_date_features(data, date_column='Date'):
     data['Week'] = data[date_column].dt.isocalendar().week.astype(int)
     data['WeekOfYear'] = data[date_column].dt.isocalendar().week
     data['Weekday'] = data[date_column].dt.dayofweek  # 0 = Monday, 6 = Sunday
-    data['IsWeekend'] = data[date_column].dt.weekday >= 5
+    data['IsWeekend'] = (data[date_column].dt.weekday >= 5).astype(int)
 
     logger.info("Date features extracted successfully.")
     return data
@@ -62,12 +42,12 @@ def generate_holiday_data(data, date_column='Date', country='ET'):
     logger.info(f"Starting to generate holiday data for {country}...")
     holiday_calendar = holidays.country_holidays(country)
     # holiday_calendar = holidays.CountryHoliday(country)
-    data['IsHoliday'] = data[date_column].apply(lambda date: date in holiday_calendar)#.astype(bool)
+    data['IsHoliday'] = data[date_column].apply(lambda date: date in holiday_calendar).astype(int)
     # data['IsHoliday'] = data.index.to_series().apply(lambda date: date in holiday_calendar).astype(bool)
 
 
     # Use the get method to retrieve holiday names
-    data['Holiday'] = data[date_column].apply(lambda date: holiday_calendar.get(date, None))
+    # data['Holiday'] = data[date_column].apply(lambda date: holiday_calendar.get(date, None))
     # data['Holiday'] = data[date_column].apply(
     #     lambda x: next((holiday for holiday in holiday_calendar.keys() if pd.Timestamp(holiday) == x), None)
     # )
@@ -76,17 +56,17 @@ def generate_holiday_data(data, date_column='Date', country='ET'):
     #     left_on=date_column, right_on='Holiday_Date', how='left').drop(columns=['Holiday_Date']
     # )
 
-    def holiday_status(row):
-        date = pd.Timestamp(row[date_column])
-        if date in holiday_calendar:
-            return 'During'
-        closest_holiday = min(
-            (pd.Timestamp(holiday) for holiday in holiday_calendar.keys() if pd.Timestamp(holiday) > date),
-            default=None
-        )
-        return 'Before' if closest_holiday is not None and date < closest_holiday else 'After'
+    # def holiday_status(row):
+    #     date = pd.Timestamp(row[date_column])
+    #     if date in holiday_calendar:
+    #         return 'During'
+    #     closest_holiday = min(
+    #         (pd.Timestamp(holiday) for holiday in holiday_calendar.keys() if pd.Timestamp(holiday) > date),
+    #         default=None
+    #     )
+    #     return 'Before' if closest_holiday is not None and date < closest_holiday else 'After'
 
-    data['Holiday_Status'] = data.apply(holiday_status, axis=1)
+    # data['Holiday_Status'] = data.apply(holiday_status, axis=1)
 
     logger.info("Holiday data generated successfully.")
     return data
@@ -151,11 +131,11 @@ def create_interaction_features(data):
     logger.info("Starting to create interaction features...")
     data['CompetitionActive'] = ((data['Year'] > data['CompetitionOpenSinceYear']) |
                                  ((data['Year'] == data['CompetitionOpenSinceYear']) & 
-                                  (data['Month'] >= data['CompetitionOpenSinceMonth'])))
+                                  (data['Month'] >= data['CompetitionOpenSinceMonth']))).astype(int)
 
     data['Promo2Active'] = ((data['Year'] > data['Promo2SinceYear']) |
                             ((data['Year'] == data['Promo2SinceYear']) & 
-                             (data['WeekOfYear'] >= data['Promo2SinceWeek'])))
+                             (data['WeekOfYear'] >= data['Promo2SinceWeek']))).astype(int)
 
     data['CompetitionMonthsOpen'] = 12 * (data['Year'] - data['CompetitionOpenSinceYear']) + \
                                      (data['Month'] - data['CompetitionOpenSinceMonth'])
@@ -167,84 +147,3 @@ def create_interaction_features(data):
 
     logger.info("Interaction features created successfully.")
     return data
-
-def encode_categorical_features(data, label_encoders=None):
-    """Encode categorical variables into numerical values."""
-
-    data = data.copy()
-    logger.info("Starting to encode categorical features...")
-    if label_encoders is None:
-        label_encoders = {}
-
-    for column in ['StoreType', 'Assortment', 'PromoInterval', 'StateHoliday']:
-        le = label_encoders.get(column, LabelEncoder())
-        data[column] = le.fit_transform(data[column])
-        label_encoders[column] = le
-
-    logger.info("Categorical features encoded successfully.")
-    return data, label_encoders
-
-def scale_numerical_features(data, scaler=None):
-    """Scale numerical columns for consistency."""
-    
-    data = data.copy()
-    logger.info("Starting to scale numerical features...")
-    numerical_columns = ['CompetitionDistance', 'CompetitionMonthsOpen', 'Promo2WeeksActive']
-
-    if scaler is None:
-        scaler = StandardScaler()
-        data[numerical_columns] = scaler.fit_transform(data[numerical_columns])
-    else:
-        data[numerical_columns] = scaler.transform(data[numerical_columns])
-
-    logger.info("Numerical features scaled successfully.")
-    return data, scaler
-
-def preprocess_data(data, store, label_encoders=None, scaler=None):
-    """Preprocess the data by merging and applying feature engineering."""
-    
-    data = data.copy()
-    logger.info("Starting to preprocess data...")
-    # Merge train/test with store data
-    data = data.merge(store, on='Store', how='left')
-
-    # Handle Missing Data
-    data = handle_missing_data(data)
-
-    # Generate Holidays Features
-    data = generate_holiday_data(data)
-
-    # Extract Date Features
-    data = extract_date_features(data)
-
-    # Generate Competitor Features
-    data = generate_competitor_features(data)
-
-    # Generate Interaction Features
-    data = create_interaction_features(data)
-
-    # Encode Categorical Features
-    data, label_encoders = encode_categorical_features(data, label_encoders)
-
-    # Scale Numerical Features
-    data, scaler = scale_numerical_features(data, scaler)
-
-    logger.info("Data preprocessing completed successfully.")
-    return data, label_encoders, scaler
-
-# Main Preprocessing Function
-def preprocess_datasets(train, test, store):
-    """Preprocess training, test, and store data, applying feature engineering."""
-
-    store_cleaned = handle_missing_data(store)
-
-    # Preprocess train and test for unique cases
-    train = generate_sales_features(train)
-
-    # Preprocess training data
-    train_preprocessed, label_encoders, scaler = preprocess_data(train, store_cleaned)
-
-    # Preprocess test data using the fitted encoders and scaler from training data
-    test_preprocessed, _, _ = preprocess_data(test, store_cleaned, label_encoders, scaler)
-
-    return train_preprocessed, test_preprocessed, store_cleaned
