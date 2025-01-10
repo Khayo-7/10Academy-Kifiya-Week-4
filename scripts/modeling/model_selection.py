@@ -1,10 +1,10 @@
+from itertools import product
 from xgboost import XGBRegressor
 from lightgbm import LGBMRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor, StackingRegressor
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
-
-from itertools import product
+from sklearn.metrics import mean_squared_error
 
 import tensorflow as tf
 from tensorflow.keras.layers import Bidirectional
@@ -166,39 +166,41 @@ def train_stacking(models, X_train, y_train):
     )
     stacked_model.fit(X_train, y_train)
     return stacked_model
-
-def build_lstm_model(input_shape):
+def build_lstm_model(input_shape, learning_rate=0.001, dropout=0.2, loss='mse', metrics=['mae']):
     """
-    Build an LSTM model for time-series prediction.
+    Build an LSTM model for time-series prediction with user-defined hyperparameters.
 
     Args:
     - input_shape: Shape of the input data (timesteps, features).
+    - learning_rate: Learning rate for the optimizer.
+    - dropout: Dropout rate for the dropout layers.
+    - loss: Loss function for the model.
+    - metrics: List of metrics to evaluate the model.
 
     Returns:
     - model: Compiled LSTM model.
     """
     model = Sequential([
         LSTM(64, activation='relu', return_sequences=True, input_shape=input_shape),
-        Dropout(0.2),
+        Dropout(dropout),
         LSTM(32, activation='relu'),
-        Dropout(0.2),
+        Dropout(dropout),
         Dense(1)
     ])
-    model.compile(optimizer=Adam(learning_rate=0.001), loss='mse', metrics=['mae'])
+    model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss, metrics=metrics)
     return model
 
-def build_bidirectional_lstm(input_shape):
+def build_bidirectional_lstm(input_shape, learning_rate=0.001, dropout=0.2, loss='mse', metrics=['mae']):
     model = Sequential([
         Bidirectional(LSTM(64, activation='relu', return_sequences=True), input_shape=input_shape),
-        Dropout(0.2),
+        Dropout(dropout),
         Bidirectional(LSTM(32, activation='relu')),
-        Dropout(0.2),
+        Dropout(dropout),
         Dense(1)
     ])
-    model.compile(optimizer=Adam(learning_rate=0.001), loss='mse', metrics=['mae'])
+    model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss, metrics=metrics)
     return model
-
-def hyperparameter_tuning_LTSM(X_train, y_train, X_val, y_val, config=None):
+def hyperparameter_tuning_LTSM(X_train, y_train, X_val, y_val, bidirectional=False, config=None):
     """
     Perform hyperparameter tuning for LSTM.
 
@@ -229,13 +231,18 @@ def hyperparameter_tuning_LTSM(X_train, y_train, X_val, y_val, config=None):
     
     for units, dropout, lr in param_combinations:
         print(f"Testing configuration: units={units}, dropout={dropout}, lr={lr}")
-        model = Sequential([
-            LSTM(units, activation='relu', return_sequences=True, input_shape=X_train.shape[1:]),
-            Dropout(dropout),
-            LSTM(units // 2, activation='relu'),
-            Dropout(dropout),
-            Dense(1)
-        ])
+        model = Sequential()
+        if bidirectional:
+            model.add(Bidirectional(LSTM(64, activation='relu', return_sequences=True), input_shape=X_train.shape[1:]))
+        else:
+            model.add(LSTM(units, activation='relu', return_sequences=True, input_shape=X_train.shape[1:]))
+        model.add(Dropout(dropout))
+        if bidirectional:
+            model.add(Bidirectional(LSTM(units // 2, activation='relu')))
+        else:
+            model.add(LSTM(units // 2, activation='relu'))
+        model.add(Dropout(dropout))
+        model.add(Dense(1))
         model.compile(optimizer=Adam(learning_rate=lr), loss='mse')
         
         history = model.fit(X_train, y_train, epochs=10, batch_size=32, validation_data=(X_val, y_val), verbose=0)
