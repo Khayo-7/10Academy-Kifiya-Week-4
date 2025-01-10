@@ -9,22 +9,22 @@ def evaluate_model(y_true, y_pred):
     Evaluate a regression model.
 
     Args:
-        model: Trained model.
         X_test: Predicted values.
         y_true: True target values.
 
     Returns:
-        dict: Evaluation metrics (MAE, MSE, R2).
+        dict: Evaluation metrics (MAE, MSE, R2, ...).
     """
     return {
         "MAE": mean_absolute_error(y_true, y_pred),
         "MSE": mean_squared_error(y_true, y_pred),
+        # "RMSE": mean_squared_error(y_true, y_pred, squared=False),
         "RMSE": np.sqrt(mean_squared_error(y_true, y_pred)),
         "R2": r2_score(y_true, y_pred),
         "Median AE": median_absolute_error(y_true, y_pred),
         "Explained Variance": explained_variance_score(y_true, y_pred),
+        # "MAPE": (abs((y_true - y_pred) / y_true).mean()) * 100,
     }
-
 
 def predict(model, X_test):
     """

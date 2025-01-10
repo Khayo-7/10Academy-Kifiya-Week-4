@@ -4,7 +4,10 @@ from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor, StackingRegressor
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 
+from itertools import product
+
 import tensorflow as tf
+from tensorflow.keras.layers import Bidirectional
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, LSTM, Dropout
 from tensorflow.keras.optimizers import Adam
@@ -183,3 +186,63 @@ def build_lstm_model(input_shape):
     ])
     model.compile(optimizer=Adam(learning_rate=0.001), loss='mse', metrics=['mae'])
     return model
+
+def build_bidirectional_lstm(input_shape):
+    model = Sequential([
+        Bidirectional(LSTM(64, activation='relu', return_sequences=True), input_shape=input_shape),
+        Dropout(0.2),
+        Bidirectional(LSTM(32, activation='relu')),
+        Dropout(0.2),
+        Dense(1)
+    ])
+    model.compile(optimizer=Adam(learning_rate=0.001), loss='mse', metrics=['mae'])
+    return model
+
+def hyperparameter_tuning(X_train, y_train, X_val, y_val, config=None):
+    """
+    Perform hyperparameter tuning for LSTM.
+
+    Args:
+    - X_train: Training data (features).
+    - y_train: Training data (target).
+    - X_val: Validation data (features).
+    - y_val: Validation data (target).
+    - config: Dictionary of hyperparameter options.
+
+    Returns:
+    - best_model: LSTM model with the best validation performance.
+    - best_metrics: Evaluation metrics of the best model.
+    """
+    best_model = None
+    best_metrics = {"RMSE": float("inf")}
+
+    if not config:
+        config = {
+            "units": [32, 64, 128],
+            "dropout": [0.1, 0.2, 0.3],
+            "learning_rate": [0.001, 0.0005],
+            "batch_size": [32, 64],
+            "epochs": [50, 100]
+        }
+    
+    param_combinations = list(product(config['units'], config['dropout'], config['learning_rate']))
+    
+    for units, dropout, lr in param_combinations:
+        print(f"Testing configuration: units={units}, dropout={dropout}, lr={lr}")
+        model = Sequential([
+            LSTM(units, activation='relu', return_sequences=True, input_shape=X_train.shape[1:]),
+            Dropout(dropout),
+            LSTM(units // 2, activation='relu'),
+            Dropout(dropout),
+            Dense(1)
+        ])
+        model.compile(optimizer=Adam(learning_rate=lr), loss='mse')
+        
+        history = model.fit(X_train, y_train, epochs=10, batch_size=32, validation_data=(X_val, y_val), verbose=0)
+        val_rmse = mean_squared_error(y_val, model.predict(X_val), squared=False)
+
+        if val_rmse < best_metrics["RMSE"]:
+            best_metrics = {"RMSE": val_rmse}
+            best_model = model
+            
+    return best_model, best_metrics

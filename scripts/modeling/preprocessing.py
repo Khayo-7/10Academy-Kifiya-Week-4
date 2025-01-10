@@ -61,12 +61,32 @@ def scale_numerical_features(data, scaler=None):
     logger.info("Numerical features scaled successfully.")
     return data, scaler
 
-def split_data(train_preprocessed, target, drop_columns=None, test_size= 0.2, random_state=42):
-
+def prepare_data_for_modeling(train_preprocessed, target, drop_columns=None, sequence=False, timesteps=30):
+    
     X = train_preprocessed.drop(columns=list(set(drop_columns + [target])))
     y = train_preprocessed[target]
     
-    return train_test_split(X, y, test_size=test_size, random_state=random_state)
+    if sequence:
+        timesteps = 2
+        X, y = create_sequences(X, y, timesteps)
+
+    return X, y
+
+def split_data(X, y, test_size= 0.2, random_state=42):
+
+    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=test_size, random_state=random_state)
+
+    X_train = np.array(X_train, dtype=np.float32)
+    y_train = np.array(y_train, dtype=np.float32)
+    X_val = np.array(X_val, dtype=np.float32)
+    y_val = np.array(y_val, dtype=np.float32)
+
+    # X_train = X_train.astype(np.float32)
+    # y_train = y_train.astype(np.float32)
+    # X_val = X_val.astype(np.float32)
+    # y_val = y_val.astype(np.float32)
+
+    return X_train, y_train, X_val, y_val
 
 def create_sequences(data, target, timesteps=30):
     """
