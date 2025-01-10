@@ -198,7 +198,7 @@ def build_bidirectional_lstm(input_shape):
     model.compile(optimizer=Adam(learning_rate=0.001), loss='mse', metrics=['mae'])
     return model
 
-def hyperparameter_tuning(X_train, y_train, X_val, y_val, config=None):
+def hyperparameter_tuning_LTSM(X_train, y_train, X_val, y_val, config=None):
     """
     Perform hyperparameter tuning for LSTM.
 
