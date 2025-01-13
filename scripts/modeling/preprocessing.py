@@ -1,49 +1,143 @@
+import joblib
 import argparse
+import pandas as pd
 from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
 
 from scripts.data_utils.feature_engineering import *
+from scripts.data_utils.loaders import save_csv
 from scripts.utils.logger import setup_logger
 
 # Setup logger for preprocessing.py
 logger = setup_logger("Preprocessing")
 
 def handle_missing_data(data):
-    """Handle missing values in the data."""
+    """
+    Handle missing values in the data using imputers.
+    """
     data = data.copy()
     logger.info("Starting to handle missing data...")
-    # Replace missing CompetitionDistance with a large value (assumed no competition nearby)
-    data['CompetitionDistance'] = data['CompetitionDistance'].fillna(data['CompetitionDistance'].max() * 2)
 
-    # Replace missing competition open dates with default values
-    data['CompetitionOpenSinceYear'] = data['CompetitionOpenSinceYear'].fillna(data['CompetitionOpenSinceYear'].median())
-    data['CompetitionOpenSinceMonth'] = data['CompetitionOpenSinceMonth'].fillna(1)
+    data = data.replace([np.inf, -np.inf], np.nan)
 
-    # Replace missing Promo2 information with defaults
-    data['Promo2SinceYear'] = data['Promo2SinceYear'].fillna(0)
-    data['Promo2SinceWeek'] = data['Promo2SinceWeek'].fillna(0)
-    data['PromoInterval'] = data['PromoInterval'].fillna('')
+    # Create imputers for different strategies
+    sales_per_customer_imputer = SimpleImputer(strategy="constant", fill_value=0)
+    sales_growth_rate_imputer = SimpleImputer(strategy="constant", fill_value=0)
+    open_imputer = SimpleImputer(strategy="constant", fill_value=0)
 
-    logger.info("Missing data handled successfully.")
+    # Apply imputers to respective columns
+    data['SalesPerCustomer'] = sales_per_customer_imputer.fit_transform(data[['SalesPerCustomer']])
+    data['SalesGrowthRate'] = sales_growth_rate_imputer.fit_transform(data[['SalesGrowthRate']])
+    data['Open'] = open_imputer.fit_transform(data[['Open']])
+
+    logger.info("Missing data handled successfully using imputers.")
     return data
 
-def encode_categorical_features(data, label_encoders=None):
-    """Encode categorical variables into numerical values."""
+def handle_missing_store_data(data):
+    """
+    Handle missing values in the data using imputers for store dataset.
+    """
+    data = data.copy()
+    logger.info("Starting to handle missing data for store dataset...")
 
+    data = data.replace([np.inf, -np.inf], np.nan)
+
+    # Create imputers for different strategies
+    competition_distance_imputer = SimpleImputer(strategy="constant", fill_value=data['CompetitionDistance'].max() * 2)
+    competition_open_year_imputer = SimpleImputer(strategy="median")
+    # competition_open_year_imputer = SimpleImputer(strategy="constant", fill_value=0)
+    competition_open_month_imputer = SimpleImputer(strategy="constant", fill_value=1)
+    promo2_year_imputer = SimpleImputer(strategy="constant", fill_value=0)
+    promo2_week_imputer = SimpleImputer(strategy="constant", fill_value=0)
+    promo_interval_imputer = SimpleImputer(strategy="constant", fill_value="NoPromo")
+
+    # Apply imputers to respective columns
+    data['CompetitionDistance'] = competition_distance_imputer.fit_transform(data[['CompetitionDistance']])
+    data['CompetitionOpenSinceYear'] = competition_open_year_imputer.fit_transform(data[['CompetitionOpenSinceYear']])
+    data['CompetitionOpenSinceMonth'] = competition_open_month_imputer.fit_transform(data[['CompetitionOpenSinceMonth']])
+    data['Promo2SinceYear'] = promo2_year_imputer.fit_transform(data[['Promo2SinceYear']])
+    data['Promo2SinceWeek'] = promo2_week_imputer.fit_transform(data[['Promo2SinceWeek']])
+    data['PromoInterval'] = data['PromoInterval'].fillna('NoPromo')
+    # data['PromoInterval'] = promo_interval_imputer.fit_transform(data[['PromoInterval']].astype(str))
+
+    logger.info("Missing data handled successfully using imputers for store dataset.")
+    return data
+
+def encode_categorical_features(data, method='label', label_encoders=None, onehot_encoder=None, categorical_columns=None):
+    """
+    Encode categorical variables into numerical values.
+
+    Parameters:
+    - data (pd.DataFrame): Input data.
+    - method (str): Encoding method. Options: 'label' or 'onehot'.
+    - label_encoders (dict): Pre-trained label encoders for label encoding (used with 'label' method).
+    - onehot_encoder (ColumnTransformer): Pre-trained ColumnTransformer for one-hot encoding (used with 'onehot' method).
+    - categorical_columns (list): List of columns to encode. Defaults to known categorical columns.
+
+    Returns:
+    - pd.DataFrame: Encoded data.
+    - dict or ColumnTransformer: Updated label encoders (if 'label' method) or fitted ColumnTransformer.
+    """
     data = data.copy()
     logger.info("Starting to encode categorical features...")
-    if label_encoders is None:
-        label_encoders = {}
+    
+    if categorical_columns is None:
+        categorical_columns = ['StoreType', 'Assortment', 'PromoInterval', 'StateHoliday', 'BeforeAfterCompetitorOpening']
 
-    for column in ['StoreType', 'Assortment', 'PromoInterval', 'StateHoliday']:
-        le = label_encoders.get(column, LabelEncoder())
-        data[column] = le.fit_transform(data[column])
-        label_encoders[column] = le
+    if method not in ['label', 'onehot']:
+        raise ValueError("Invalid method. Choose 'label' or 'onehot'.")
 
-    logger.info("Categorical features encoded successfully.")
-    return data, label_encoders
+    if method == 'label':
+        # Use LabelEncoder for each categorical column
+        if label_encoders is None:
+            label_encoders = {}
+
+        for column in categorical_columns:
+            le = label_encoders.get(column, LabelEncoder())
+            data[column] = le.fit_transform(data[column].astype(str))
+            label_encoders[column] = le
+
+        logger.info("Categorical features encoded with label encoding.")
+        return data, label_encoders
+
+    elif method == 'onehot':
+        # Use ColumnTransformer with OneHotEncoder
+        if onehot_encoder is None:
+            onehot_encoder = ColumnTransformer(
+                transformers=[
+                    ('onehot', OneHotEncoder(sparse_output=False, handle_unknown='ignore'), categorical_columns)
+                ],
+                remainder='passthrough'  # Keep non-categorical columns as they are
+            )
+
+        # Fit and transform the data
+        encoded_array = onehot_encoder.fit_transform(data)
+
+        # Extract feature names
+        feature_names = onehot_encoder.get_feature_names_out()
+        feature_names = [col.replace("onehot__", "").replace("remainder__", "") for col in feature_names]
+        encoded_df = pd.DataFrame(encoded_array, columns=feature_names, index=data.index)
+
+        logger.info("Categorical features encoded with one-hot encoding using ColumnTransformer.")
+        return encoded_df, onehot_encoder
+
+# def encode_categorical_features(data, label_encoders=None):
+#     """Encode categorical variables into numerical values."""
+
+#     data = data.copy()
+#     logger.info("Starting to encode categorical features...")
+#     if label_encoders is None:
+#         label_encoders = {}
+
+#     for column in ['StoreType', 'Assortment', 'PromoInterval', 'StateHoliday']:
+#         le = label_encoders.get(column, LabelEncoder())
+#         data[column] = le.fit_transform(data[column])
+#         label_encoders[column] = le
+
+#     logger.info("Categorical features encoded successfully.")
+#     return data, label_encoders
 
 def scale_numerical_features(data, scaler=None):
     """Scale numerical columns for consistency."""
@@ -61,13 +155,12 @@ def scale_numerical_features(data, scaler=None):
     logger.info("Numerical features scaled successfully.")
     return data, scaler
 
-def prepare_data_for_modeling(train_preprocessed, target, drop_columns=None, sequence=False, timesteps=30):
-    
-    X = train_preprocessed.drop(columns=list(set(drop_columns + [target])))
-    y = train_preprocessed[target]
+def prepare_data_for_modeling(train_data, target, drop_columns=None, sequence=False, timesteps=30):
+
+    X = train_data.drop(columns=list(set(drop_columns + [target])))
+    y = train_data[target]
     
     if sequence:
-        timesteps = 2
         X, y = create_sequences(X, y, timesteps)
 
     return X, y
@@ -107,8 +200,7 @@ def create_sequences(data, target, timesteps=30):
         y.append(target[i])           # Target at 'i'
     return np.array(X), np.array(y)
 
-
-def preprocess_data(data, store, label_encoders=None, scaler=None):
+def preprocess_data(data, store, method='label', encoders=None, scaler=None):
     """Preprocess the data by merging and applying feature engineering."""
     
     data = data.copy()
@@ -132,27 +224,38 @@ def preprocess_data(data, store, label_encoders=None, scaler=None):
     data = create_interaction_features(data)
 
     # Encode Categorical Features
-    data, label_encoders = encode_categorical_features(data, label_encoders)
+    data, encoders = encode_categorical_features(data, method=method, label_encoders=encoders)
 
     # Scale Numerical Features
     data, scaler = scale_numerical_features(data, scaler)
 
     logger.info("Data preprocessing completed successfully.")
-    return data, label_encoders, scaler
+    return data, encoders, scaler
 
 # Main Preprocessing Function
-def preprocess_datasets(train, test, store):
+def preprocess_datasets(train, test, store, method='label', group_by='Store'):
     """Preprocess training, test, and store data, applying feature engineering."""
 
-    store_cleaned = handle_missing_data(store)
+    store_cleaned = handle_missing_store_data(store)
+    store_processed = generate_competitor_open_date(store_cleaned)
 
     # Preprocess train and test for unique cases
     train = generate_sales_features(train)
-
+    sales_agg = calculate_sales_aggregates(train, group_by=group_by)
+    sales_agg = sales_agg.replace([np.inf, -np.inf], np.nan)
+    test = generate_sales_features(test, training=False, sales_agg=sales_agg.set_index(group_by))
+    
     # Preprocess training data
-    train_preprocessed, label_encoders, scaler = preprocess_data(train, store_cleaned)
+    train_preprocessed, label_encoders, scaler = preprocess_data(train, store_processed, method=method)
 
     # Preprocess test data using the fitted encoders and scaler from training data
-    test_preprocessed, _, _ = preprocess_data(test, store_cleaned, label_encoders, scaler)
+    test_preprocessed, label_encoders, scaler = preprocess_data(test, store_processed, method=method, encoders=label_encoders, scaler=scaler)
 
-    return train_preprocessed, test_preprocessed, store_cleaned
+    store_preprocessed = store_processed.merge(sales_agg, on=group_by, how='inner')
+    save_csv(store_preprocessed, output_path="../resources/data/processed_store.csv")
+
+    # Save Encoders and Scaler models for a later use in deployment
+    joblib.dump(scaler, f"../resources/scalers/{method}_scaler.pkl")
+    joblib.dump(label_encoders, f"../resources/encoders/{method}_encoders.pkl")
+
+    return train_preprocessed, test_preprocessed, store_preprocessed, scaler, label_encoders

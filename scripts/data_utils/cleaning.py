@@ -13,6 +13,7 @@ def clean_data(data, date_column = 'Date'):
     
     data = data.drop(columns=['Id']) if 'Id' in data.columns else data
     data ['StateHoliday'] = data['StateHoliday'].astype(str)
+    data = data.replace([np.inf, -np.inf], np.nan)
 
     return data
 
@@ -96,7 +97,6 @@ def remove_irrelevant_columns(data, columns_to_drop):
     logger.info(f"Dropped columns: {columns_to_drop}")
     
     return data
-
 
 def missing_value_summary(data: pd.DataFrame) -> pd.DataFrame:
     """

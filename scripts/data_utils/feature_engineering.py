@@ -71,42 +71,91 @@ def generate_holiday_data(data, date_column='Date', country='ET'):
     logger.info("Holiday data generated successfully.")
     return data
 
-def generate_sales_features(data):
+def generate_sales_features(data, training=True, sales_agg=None):
     """
-    This function calculates the sales growth rate.
+    Generate sales-related features. Handles cases where `Sales` is not available in the dataset.
 
     Args:
-        data (pd.DataFrame): The dataframe containing the sales data.
+        data (pd.DataFrame): Input dataframe with sales data.
+        for_training (bool): Whether the data is for training. If False, proxies will be used.
+        sales_agg (pd.DataFrame): Aggregated statistics for `SalesPerCustomer` or similar features.
 
     Returns:
-        pd.DataFrame: The dataframe with the sales growth rate calculated.
+        pd.DataFrame: Dataframe with sales features.
     """
     data = data.copy()
-    logger.info("Starting to calculate sales growth rate...")
-    data['Sales_per_Customer'] = data['Sales'] / data['Customers']
-    data['PromoEffectiveness'] = np.where(data['Promo'] == 1, data['Sales'], 0)
-    data['SalesGrowthRate'] = data['Sales'].pct_change() * 100
-    # data = data.dropna()
-    logger.info("Sales growth rate calculated successfully.")
+    logger.info("Generating sales-related features...")
+    
+    if training:
+        data['SalesPerCustomer'] = np.where(data['Customers'] > 0, 
+                                              data['Sales'] / data['Customers'], 
+                                              0)
+        data['PromoEffectiveness'] = np.where(data['Promo'] == 1, data['Sales'], 0)
+        data['SalesGrowthRate'] = data['Sales'].pct_change() * 100
+        data['SalesGrowthRate'].replace([np.inf, -np.inf], 0, inplace=True)  # Handle invalid pct_change
+    else:
+        data['SalesPerCustomer'] = data['Store'].map(sales_agg['SalesPerCustomer'])
+        data['PromoEffectiveness'] = data['Store'].map(sales_agg['PromoEffectiveness'])
+        data['SalesGrowthRate'] = np.nan  # Cannot compute without historical `Sales`
+    
+    logger.info("Sales features generated successfully.")
+    return data
+
+def calculate_sales_aggregates(data, group_by='Store'):
+    """
+    Calculate aggregated sales features for use in test data preprocessing.
+
+    Args:
+        data (pd.DataFrame): Training data containing `Sales`, `Customers`, and `Promo`.
+        group_by (str): Column to group data by (e.g., 'Store').
+
+    Returns:
+        pd.DataFrame: Aggregated sales metrics as a lookup table.
+    """
+    logger.info("Calculating sales aggregates...")
+
+    # Filter out rows with missing or zero values to ensure clean aggregates
+    data = data.copy()
+    data = data[data['Customers'] > 0]
+
+    # Group by and aggregate sales-related metrics
+    sales_agg = data.groupby(group_by).agg(
+        SalesPerCustomer=('Sales', lambda x: (x / data['Customers']).mean()),
+        PromoEffectiveness=('Sales', lambda x: x[data['Promo'] == 1].mean())
+    ).reset_index()
+
+    logger.info("Sales aggregates calculated successfully.")
+    return sales_agg
+
+def generate_competitor_open_date(data):
+    """Creates a 'CompetitionOpenSince' column from month and year columns."""
+    
+    data = data.copy()
+    logger.info("Starting to generate competitor opening date...")
+
+    data['CompetitionOpenSince'] = pd.to_datetime(
+        data['CompetitionOpenSinceYear'].fillna(0).astype(int).astype(str) + '-' +
+        data['CompetitionOpenSinceMonth'].fillna(1).astype(int).astype(str) + '-01', 
+        format='%Y-%m-%d', 
+        errors='coerce'
+    )
+    
+    logger.info("Competitor opening date generated successfully.")
     return data
 
 def generate_competitor_features(data, date_column='Date'):
-    """Adds a 'Before_After_Competitor_Opening' column based on Competitor_Open_Date."""
-    """Creates a 'Competitor_Open_Date' column from month and year columns."""
-    
+    """Adds a 'BeforeAfterCompetitorOpening' column based on CompetitionOpenSince."""
     data = data.copy()
     logger.info("Starting to generate competitor features...")
-    data['Competitor_Open_Date'] = pd.to_datetime(
-        data['CompetitionOpenSinceYear'].astype(str) + '-' + data['CompetitionOpenSinceMonth'].astype(str) + '-01', 
-        format='%Y-%m-%d', errors='coerce'
-    )
-    
-    # Create a boolean mask for comparison
-    competitor_open_date_max = data['Competitor_Open_Date'].max()
-    data['Before_After_Competitor_Opening'] = data[date_column].apply(
-        lambda x: 'Before' if x < competitor_open_date_max else 'After'
-    )
 
+    # Create a boolean mask for comparison
+    # competitor_open_date_max = data['CompetitionOpenSince'].max()
+    # data['BeforeAfterCompetitorOpening'] = data[date_column].apply(
+    #     lambda x: 'Before' if x < competitor_open_date_max else 'After'
+    # )
+    data['BeforeAfterCompetitorOpening'] = data.apply(
+        lambda x: 'Before' if x['Date'] < x['CompetitionOpenSince'] else 'After', axis=1
+    )
     logger.info("Competitor features generated successfully.")
     return data
 

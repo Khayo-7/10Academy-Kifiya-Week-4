@@ -7,11 +7,17 @@ from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.metrics import mean_squared_error
 
 import tensorflow as tf
-from tensorflow.keras.layers import Bidirectional
+import tensorflow.keras.backend as K
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, LSTM, Dropout
+from tensorflow.keras.layers import Dense, LSTM, Dropout, Bidirectional
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.saving import register_keras_serializable
+from tensorflow.keras.losses import MeanSquaredError 
 
+from scripts.utils.logger import setup_logger
+
+# Setup logger for model_selection.py
+logger = setup_logger("model_selection")
 
 def train_linear_regression(X_train, y_train):
     """
@@ -24,10 +30,10 @@ def train_linear_regression(X_train, y_train):
     Returns:
         model: Trained Linear Regression model.
     """
-
+    logger.info("Starting to train linear regression model...")
     model = LinearRegression()
     model.fit(X_train, y_train)
-
+    logger.info("Linear regression model training completed.")
     return model
 
 def train_random_forest(X_train, y_train, params=None):
@@ -42,6 +48,7 @@ def train_random_forest(X_train, y_train, params=None):
     Returns:
     - model: Trained Random Forest model.
     """
+    logger.info("Starting to train random forest model...")
     if not params:
         # Default parameters if none provided
         params = {
@@ -54,6 +61,7 @@ def train_random_forest(X_train, y_train, params=None):
 
     model = RandomForestRegressor(**params)
     model.fit(X_train, y_train)
+    logger.info("Random forest model training completed.")
     return model
     
 def train_xgboost(X_train, y_train, params=None):
@@ -68,6 +76,7 @@ def train_xgboost(X_train, y_train, params=None):
     Returns:
         model: Trained XGBoost model.
     """
+    logger.info("Starting to train XGBoost model...")
     if not params:
         params = {
             'objective': 'reg:squarederror',
@@ -75,13 +84,13 @@ def train_xgboost(X_train, y_train, params=None):
             'learning_rate': 0.1,
             'n_estimators': 100,
             'max_depth': 6,
-            'verbosity': 0,
+            # 'verbosity': 0,
             'random_state': 42
         }    
 
     model = XGBRegressor(**params)
     model.fit(X_train, y_train)
-
+    logger.info("XGBoost model training completed.")
     return model
 
 def train_lightgbm(X_train, y_train, params=None):
@@ -96,6 +105,7 @@ def train_lightgbm(X_train, y_train, params=None):
     Returns:
     - model: Trained LightGBM model.
     """
+    logger.info("Starting to train LightGBM model...")
     if not params:
         params = {
             'objective': 'regression',
@@ -108,6 +118,7 @@ def train_lightgbm(X_train, y_train, params=None):
 
     lgb_model = LGBMRegressor(**params)
     lgb_model.fit(X_train, y_train)
+    logger.info("LightGBM model training completed.")
     return lgb_model
 
 def hyperparameter_tuning(model, X_train, y_train, param_grid, choice='grid', n_iter=10):
@@ -126,6 +137,7 @@ def hyperparameter_tuning(model, X_train, y_train, param_grid, choice='grid', n_
         best_model: Best model after hyperparameter tuning.
         best_params: Optimal parameters.
     """
+    logger.info("Starting hyperparameter tuning...")
     if choice == 'random':
         search = RandomizedSearchCV(
             estimator=model,
@@ -141,9 +153,8 @@ def hyperparameter_tuning(model, X_train, y_train, param_grid, choice='grid', n_
         search = GridSearchCV(model, param_grid, cv=5, scoring='neg_mean_squared_error')
     
     search.fit(X_train, y_train)
-
+    logger.info("Hyperparameter tuning completed.")
     return search.best_estimator_, search.best_params_
-
 
 def train_stacking(models, X_train, y_train):
     """
@@ -157,6 +168,7 @@ def train_stacking(models, X_train, y_train):
     Returns:
     - stacked_model: Trained stacking regressor.
     """
+    logger.info("Starting to train stacking model...")
     stacked_model = StackingRegressor(
         estimators=models,
         final_estimator=XGBRegressor(),
@@ -165,7 +177,9 @@ def train_stacking(models, X_train, y_train):
         n_jobs=-1
     )
     stacked_model.fit(X_train, y_train)
+    logger.info("Stacking model training completed.")
     return stacked_model
+
 def build_lstm_model(input_shape, learning_rate=0.001, dropout=0.2, loss='mse', metrics=['mae']):
     """
     Build an LSTM model for time-series prediction with user-defined hyperparameters.
@@ -180,6 +194,7 @@ def build_lstm_model(input_shape, learning_rate=0.001, dropout=0.2, loss='mse', 
     Returns:
     - model: Compiled LSTM model.
     """
+    logger.info("Building LSTM model...")
     model = Sequential([
         LSTM(64, activation='relu', return_sequences=True, input_shape=input_shape),
         Dropout(dropout),
@@ -187,7 +202,10 @@ def build_lstm_model(input_shape, learning_rate=0.001, dropout=0.2, loss='mse', 
         Dropout(dropout),
         Dense(1)
     ])
+    # model.compile(optimizer='adam', loss='mean_squared_error', metrics=['mse']) 
+    # model.compile(optimizer=Adam(learning_rate=learning_rate), loss='mse', metrics=['mae'])
     model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss, metrics=metrics)
+    logger.info("LSTM model built successfully.")
     return model
 
 def build_bidirectional_lstm(input_shape, learning_rate=0.001, dropout=0.2, loss='mse', metrics=['mae']):
@@ -200,6 +218,7 @@ def build_bidirectional_lstm(input_shape, learning_rate=0.001, dropout=0.2, loss
     ])
     model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss, metrics=metrics)
     return model
+
 def hyperparameter_tuning_LTSM(X_train, y_train, X_val, y_val, bidirectional=False, config=None):
     """
     Perform hyperparameter tuning for LSTM.
@@ -215,6 +234,7 @@ def hyperparameter_tuning_LTSM(X_train, y_train, X_val, y_val, bidirectional=Fal
     - best_model: LSTM model with the best validation performance.
     - best_metrics: Evaluation metrics of the best model.
     """
+    logger.info("Starting LSTM hyperparameter tuning...")
     best_model = None
     best_metrics = {"RMSE": float("inf")}
 
@@ -252,4 +272,9 @@ def hyperparameter_tuning_LTSM(X_train, y_train, X_val, y_val, bidirectional=Fal
             best_metrics = {"RMSE": val_rmse}
             best_model = model
             
+    logger.info("LSTM hyperparameter tuning completed.")
     return best_model, best_metrics
+
+@register_keras_serializable(package="Custom", name="mse")
+def mse(y_true, y_pred):
+    return K.mean(K.square(y_true - y_pred))
