@@ -20,7 +20,9 @@ processed_store_path = "../resources/data/processed_store.csv"
 
 try:
     # Load previously saved scaler (used during training)
+    logger.info("Loading previously saved scaler...")
     scaler = joblib.load(f"../resources/scalers/{method}_scaler.pkl")
+    logger.info("Loading previously saved encoders...")
     encoders = joblib.load(f"../resources/encoders/{method}_encoders.pkl")
 except Exception as e:
     logger.error(f"Error initializing application: {e}")
@@ -34,7 +36,7 @@ def preprocess_input(data: pd.DataFrame) -> np.ndarray:
     Returns:
         np.ndarray: Preprocessed and ready-to-predict input array.
     """
-
+    logger.info("Starting preprocessing of input data...")
     # Ensure consistent column ordering
     initial_columns = ['Store', 'DayOfWeek', 'Date', 'Open', 'Promo', 'StateHoliday', 'SchoolHoliday']
     drop_columns = ["Date", "DayOfWeek", "Store", "CompetitionOpenSince", "SalesGrowthRate"] # 'PromoEffectiveness'
@@ -53,16 +55,23 @@ def preprocess_input(data: pd.DataFrame) -> np.ndarray:
         missing_cols = [col for col in initial_columns if col not in data.columns]
         raise ValueError(f"Input data is missing required columns: {missing_cols}")
     
-    
+    logger.info("Cleaning data...")
     data = clean_data(data)
+    logger.info("Loading processed store data...")
     store = load_csv(processed_store_path)
+    # logger.info("Merging data with store data...")
     # data_preprocessed = data.merge(store, on=group_by, how='inner')
+    logger.info("Preprocessing data...")
     data, _, _ = preprocess_data(data, store, method=method, label_encoders=encoders, scaler=scaler)
+    logger.info("Dropping unnecessary columns...")
     data = data.drop(columns=list(set(drop_columns)))
 
     # Reorder columns to match final_columns
+    logger.info("Reordering columns...")
     data = data[final_columns]
 
     # Convert to NumPy array
+    logger.info("Converting data to NumPy array...")
     preprocessed_data = np.array(data.values, dtype=np.float32)
+    logger.info("Preprocessing complete.")
     return preprocessed_data
