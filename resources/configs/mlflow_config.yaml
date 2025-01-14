@@ -1,0 +1,6 @@
+mlflow:
+  tracking_uri: "sqlite:///mlflow.db"
+  tracking_server_uri: "http://127.0.0.1:5000"
+  experiment_name: "sales_forecasting"
+  model_registry: "sales_models"
+  default_artifact_root: "./mlruns"

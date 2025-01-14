@@ -1,13 +1,16 @@
 from pydantic import BaseModel
 from datetime import datetime
+from typing import List, Union, Optional
 
 class SalesPredictionInput(BaseModel):
-    store: int
-    day_of_week: int
-    date: str # Datetime
-    promo: int
-    state_holiday: str
-    school_holiday: int
+    Id: int
+    Store: int
+    DayOfWeek: int
+    Date: str # Datetime
+    Open: int
+    Promo: int
+    StateHoliday: str
+    SchoolHoliday: str
 
 class SalesPredictionOutput(BaseModel):
-    predicted_sales: float
+    PredictedSales: Union[float, List[float]]

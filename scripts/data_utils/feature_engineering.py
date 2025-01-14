@@ -71,7 +71,8 @@ def generate_holiday_data(data, date_column='Date', country='ET'):
     logger.info("Holiday data generated successfully.")
     return data
 
-def generate_sales_features(data, training=True, sales_agg=None):
+def generate_sales_features(data):
+# def generate_sales_features(data, training=True, sales_agg=None, group_by='Store'):
     """
     Generate sales-related features. Handles cases where `Sales` is not available in the dataset.
 
@@ -86,17 +87,18 @@ def generate_sales_features(data, training=True, sales_agg=None):
     data = data.copy()
     logger.info("Generating sales-related features...")
     
-    if training:
-        data['SalesPerCustomer'] = np.where(data['Customers'] > 0, 
-                                              data['Sales'] / data['Customers'], 
-                                              0)
-        data['PromoEffectiveness'] = np.where(data['Promo'] == 1, data['Sales'], 0)
-        data['SalesGrowthRate'] = data['Sales'].pct_change() * 100
-        data['SalesGrowthRate'].replace([np.inf, -np.inf], 0, inplace=True)  # Handle invalid pct_change
-    else:
-        data['SalesPerCustomer'] = data['Store'].map(sales_agg['SalesPerCustomer'])
-        data['PromoEffectiveness'] = data['Store'].map(sales_agg['PromoEffectiveness'])
-        data['SalesGrowthRate'] = np.nan  # Cannot compute without historical `Sales`
+    # if training:
+    data['SalesPerCustomer'] = np.where(data['Customers'] > 0, 
+                                            data['Sales'] / data['Customers'], 
+                                            0)
+    data['PromoEffectiveness'] = np.where(data['Promo'] == 1, data['Sales'], 0)
+    data['SalesGrowthRate'] = data['Sales'].pct_change() * 100
+    data['SalesGrowthRate'] = data['SalesGrowthRate'].replace([np.inf, -np.inf], 0)
+    # else:
+    #     data['SalesPerCustomer'] = data[group_by].map(sales_agg['SalesPerCustomer'])
+    #     data['PromoEffectiveness'] = data[group_by].map(sales_agg['PromoEffectiveness'])
+    #     data['SalesGrowthRate'] = data[group_by].map(sales_agg['SalesGrowthRate'])
+    #     # data['SalesGrowthRate'] = np.nan
     
     logger.info("Sales features generated successfully.")
     return data
@@ -120,9 +122,14 @@ def calculate_sales_aggregates(data, group_by='Store'):
 
     # Group by and aggregate sales-related metrics
     sales_agg = data.groupby(group_by).agg(
-        SalesPerCustomer=('Sales', lambda x: (x / data['Customers']).mean()),
-        PromoEffectiveness=('Sales', lambda x: x[data['Promo'] == 1].mean())
+        # SalesPerCustomer=('Sales', lambda x: (x / data['Customers']).mean()),
+        SalesPerCustomer=('Sales', lambda x: (x / data.loc[x.index, 'Customers']).mean()),
+        # PromoEffectiveness=('Sales', lambda x: x[data['Promo'] == 1].mean()),
+        PromoEffectiveness=('Sales', lambda x: x[data.loc[x.index, 'Promo'] == 1].mean()),
     ).reset_index()
+
+    # Calculate SalesGrowthRate
+    sales_agg['SalesGrowthRate'] = data.groupby(group_by)['Sales'].mean().pct_change() * 100
 
     logger.info("Sales aggregates calculated successfully.")
     return sales_agg
@@ -148,13 +155,9 @@ def generate_competitor_features(data, date_column='Date'):
     data = data.copy()
     logger.info("Starting to generate competitor features...")
 
-    # Create a boolean mask for comparison
-    # competitor_open_date_max = data['CompetitionOpenSince'].max()
-    # data['BeforeAfterCompetitorOpening'] = data[date_column].apply(
-    #     lambda x: 'Before' if x < competitor_open_date_max else 'After'
-    # )
+    # Create a boolean mask for compariso
     data['BeforeAfterCompetitorOpening'] = data.apply(
-        lambda x: 'Before' if x['Date'] < x['CompetitionOpenSince'] else 'After', axis=1
+        lambda x: 'Before' if x[date_column] < x['CompetitionOpenSince'] else 'After', axis=1
     )
     logger.info("Competitor features generated successfully.")
     return data

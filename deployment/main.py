@@ -6,11 +6,16 @@ from flask import Flask, request, jsonify
 from app.prediction import make_prediction
 from app.schemas import SalesPredictionInput, SalesPredictionOutput
 
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+try:
+    from scripts.utils.logger import setup_logger
+except:
+    sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
+finally:
+    from scripts.utils.logger import setup_logger
 # Setup logger for deployement
-from scripts.utils.logger import setup_logger
-logger = setup_logger("flask_deployement")
+log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
+logger = setup_logger("flask_deployement", log_dir)
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -19,13 +24,13 @@ CORS(app)  # Allow cross-origin requests
 # Define a route to test the API
 @app.route("/", methods=["GET"])
 async def home():
-    return jsonify({"message": "Welcome to the LSTM Sales Forecasting API! Server is running!"})
+    return jsonify({"message": "Welcome to the Sales Forecasting API! The server is running!"})
 
 # Define a route for predictions
 @app.route("/predict_sales", methods=["POST"])
 async def predict():
     """
-    Endpoint to predict sales using the LSTM model.
+    Endpoint to predict sales using the model.
     """
     try:
         input_dict = input_data.model_dump()
@@ -47,6 +52,6 @@ async def predict():
     
 # Run Flask server
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=8888)
+    app.run(debug=True, host="0.0.0.0", port=7777)
 
 # python app.py

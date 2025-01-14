@@ -1,3 +1,4 @@
+import os
 import joblib
 import argparse
 import pandas as pd
@@ -12,6 +13,11 @@ from scripts.utils.logger import setup_logger
 
 # Setup logger for preprocessing.py
 logger = setup_logger("Preprocessing")
+
+resources_dir = os.path.join('..', 'resources')
+store_path = os.path.join(resources_dir, 'data')
+scaler_path = os.path.join(resources_dir, 'scalers')
+encoder_path = os.path.join(resources_dir, 'encoders')
 
 def handle_missing_data(data):
     """
@@ -200,13 +206,11 @@ def create_sequences(data, target, timesteps=30):
         y.append(target[i])           # Target at 'i'
     return np.array(X), np.array(y)
 
-def preprocess_data(data, store, method='label', encoders=None, scaler=None):
+def preprocess_data(data, method='label', encoders=None, scaler=None):
     """Preprocess the data by merging and applying feature engineering."""
     
     data = data.copy()
     logger.info("Starting to preprocess data...")
-    # Merge train/test with store data
-    data = data.merge(store, on='Store', how='left')
 
     # Handle Missing Data
     data = handle_missing_data(data)
@@ -237,25 +241,33 @@ def preprocess_datasets(train, test, store, method='label', group_by='Store'):
     """Preprocess training, test, and store data, applying feature engineering."""
 
     store_cleaned = handle_missing_store_data(store)
-    store_processed = generate_competitor_open_date(store_cleaned)
+    store_preprocessed = generate_competitor_open_date(store_cleaned)
 
-    # Preprocess train and test for unique cases
+    #  Generate features for training
     train = generate_sales_features(train)
+
+    # Merge train dataset with preprocessed store dataset
+    train = train.merge(store_preprocessed, on='Store', how='left')
+
+    # Calculate sales aggregates
     sales_agg = calculate_sales_aggregates(train, group_by=group_by)
     sales_agg = sales_agg.replace([np.inf, -np.inf], np.nan)
-    test = generate_sales_features(test, training=False, sales_agg=sales_agg.set_index(group_by))
-    
-    # Preprocess training data
-    train_preprocessed, label_encoders, scaler = preprocess_data(train, store_processed, method=method)
 
-    # Preprocess test data using the fitted encoders and scaler from training data
-    test_preprocessed, label_encoders, scaler = preprocess_data(test, store_processed, method=method, encoders=label_encoders, scaler=scaler)
+    # Merge store data with sales aggregates
+    store_processed = store_preprocessed.merge(sales_agg, on=group_by, how='inner')
 
-    store_preprocessed = store_processed.merge(sales_agg, on=group_by, how='inner')
-    save_csv(store_preprocessed, output_path="../resources/data/processed_store.csv")
+    # Use store_processed to get aggregated features for the test dataset
+    test = test.merge(store_processed, on='Store', how='left')
+
+    # Preprocess training and test data
+    train_preprocessed, label_encoders, scaler = preprocess_data(train, method=method)
+    test_preprocessed, label_encoders, scaler = preprocess_data(test, method=method, encoders=label_encoders, scaler=scaler)
+
+    # Save the processed store data
+    save_csv(store_processed, output_path=os.path.join(store_path, "store_processed.csv"))
 
     # Save Encoders and Scaler models for a later use in deployment
-    joblib.dump(scaler, f"../resources/scalers/{method}_scaler.pkl")
-    joblib.dump(label_encoders, f"../resources/encoders/{method}_encoders.pkl")
+    joblib.dump(scaler, os.path.join(scaler_path, "scaler.pkl"))
+    joblib.dump(label_encoders, os.path.join(encoder_path, f"{method}_encoders.pkl"))
 
-    return train_preprocessed, test_preprocessed, store_preprocessed, scaler, label_encoders
+    return train_preprocessed, test_preprocessed, store_processed, scaler, label_encoders

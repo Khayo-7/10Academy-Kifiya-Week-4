@@ -11,4 +11,16 @@ env/
 # Ignore specific files
 */**.csv
 */**.pkl
-*/**.h5
+*/**.db
+# */**.h5
+
+# Ignore folders
+.github/
+logs/
+mlflow_integration/
+mlruns/
+notebooks/
+resources/
+screenshots/
+src/
+tests/

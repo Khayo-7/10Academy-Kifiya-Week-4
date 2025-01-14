@@ -171,16 +171,16 @@ def train_stacking(models, X_train, y_train):
     logger.info("Starting to train stacking model...")
     stacked_model = StackingRegressor(
         estimators=models,
-        final_estimator=XGBRegressor(),
-        # final_estimator=LinearRegression(),
-        cv=5,  # 5-fold cross-validation
+        # final_estimator=XGBRegressor(),
+        final_estimator=LinearRegression(),
+        cv=5,
         n_jobs=-1
     )
     stacked_model.fit(X_train, y_train)
     logger.info("Stacking model training completed.")
     return stacked_model
 
-def build_lstm_model(input_shape, learning_rate=0.001, dropout=0.2, loss='mse', metrics=['mae']):
+def build_lstm_model(input_shape, opt='adam', learning_rate=0.001, dropout=0.2, loss='mse', metrics=['mae']):
     """
     Build an LSTM model for time-series prediction with user-defined hyperparameters.
 
@@ -203,8 +203,10 @@ def build_lstm_model(input_shape, learning_rate=0.001, dropout=0.2, loss='mse', 
         Dense(1)
     ])
     # model.compile(optimizer='adam', loss='mean_squared_error', metrics=['mse']) 
-    # model.compile(optimizer=Adam(learning_rate=learning_rate), loss='mse', metrics=['mae'])
-    model.compile(optimizer=Adam(learning_rate=learning_rate), loss=loss, metrics=metrics)
+    if opt == 'adam':
+        optimizer = Adam(learning_rate=learning_rate)
+
+    model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
     logger.info("LSTM model built successfully.")
     return model
 

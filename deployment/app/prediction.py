@@ -1,47 +1,72 @@
 import os
 import sys
+import joblib
+import logging
+from typing import List, Union, Optional
+
 import pandas as pd
 import tensorflow.keras.backend as K
-from tensorflow.keras.models import load_model
-from tensorflow.keras.losses import MeanSquaredError 
-from .utils import preprocess_input
+from tensorflow.keras.models import load_model 
+from app.utils import preprocess_input
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 
-# Setup logger for deployement
-from scripts.utils.logger import setup_logger
-logger = setup_logger("deployement")
-
-# Load the trained LSTM model
 try:
-    logger.info("Starting to load the trained LSTM model...")
-    model = load_model(
-        "../resources/models/lstm_sales_model.h5",
-        custom_objects=None ,
-        # custom_objects={"mse": MeanSquaredError()} 
-    )
-    logger.info("Successfully loaded the trained LSTM model.")
+    from scripts.utils.logger import setup_logger
+except ImportError as e:
+    logging(f"Import error: {e}. Please check the module path.")
+
+# Setup logger for deployement
+log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'logs')
+logger = setup_logger("deployement", log_dir)  
+
+resources_dir = os.path.join('resources')
+model_path = os.path.join(resources_dir, 'sales_model.h5')
+model_path = os.path.join(resources_dir, 'sales_model.pkl')
+
+# Load the trained model
+try:
+    logger.info("Starting to load the trained model...")
+    model = joblib.load(model_path)
+    # model = load_model(model_path, custom_objects=None)
+    logger.info("Successfully loaded the trained model.")
 except Exception as e:
     logger.error(f"Error initializing application: {e}")
     raise
 
-def make_prediction(input_data: dict):
+def make_prediction(input_data: Union[dict, List[dict]]) -> Union[dict, List[dict]]:
+
     """
-    Generate sales prediction using the LSTM model.
-    
+    Generate sales predictions for single or batch inputs using the model.
+
     Args:
-    - input_data: Dictionary of input features.
-    
+    - input_data: A single dictionary, a list of dictionaries or a DataFrame-like 
+      dictionary of input features or a list of such dictionaries.
+
     Returns:
-    - predicted_sales: Predicted sales value.
+    - Single or batch predictions
+    - predicted_sales: Predicted sales value(s).
     """
-    logger.info("Starting to make prediction...")
-    # Convert input to DataFrame for preprocessing
-    input_df = pd.DataFrame([input_data])
-    processed_input = preprocess_input(input_df) # Scale and encode
+    logger.info("Starting prediction...")
     
-    # Generate prediction
-    prediction = model.predict(processed_input)
-    predicted_sales = float(prediction[0][0])
+    # Convert input(s) to DataFrame
+    if isinstance(input_data, dict):
+        input_df = pd.DataFrame([input_data])
+    elif isinstance(input_data, list):
+        input_df = pd.DataFrame(input_data)
+    elif "columns" in input_data and "data" in input_data:
+        input_df = pd.DataFrame(input_data["data"], columns=input_data["columns"])
+    else:
+        raise ValueError("Invalid input format")
+    
+    # Preprocess inputs
+    processed_input = preprocess_input(input_df)  # Preprocess all rows at once
+    
+    # Generate predictions
+    predictions = model.predict(processed_input)
     logger.info("Prediction made successfully.")
+    
+    # Return predictions as list
+    predicted_sales = predictions.flatten().tolist()
+    logger.info(predicted_sales)
     return predicted_sales
