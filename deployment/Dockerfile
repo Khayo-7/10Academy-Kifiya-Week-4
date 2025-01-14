@@ -1,3 +1,5 @@
+ARG RESOURCE_PATH=../resources
+
 # Building stage
 FROM python:3.12-slim AS builder
 
@@ -11,20 +13,20 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Copy installed packages from builder
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+
+# Copy source code
 COPY . .
 
-# Copy specific scripts from the scripts folder
-COPY ../scripts /app/scripts
+# Ensure paths are correct for copying resources and scripts
 
-# Copy and rename resource files
-COPY ../resources/data/store_processed.csv /app/resources/data/store.csv
-COPY ../resources/encoders/onehot_encoder.pkl /app/resources/encoders/encoder.pkl
-COPY ../resources/scalers/scaler.pkl /app/resources/scalers/scaler.pkl
-
-# Copy the model files
-COPY  ../resources/models/ltsm_sales_model.pkl /app/models/sales_model.pkl
-COPY  ../resources/models/ltsm_sales_model.hs /app/models/sales_model.hs
+# COPY scripts /app/scripts
+# COPY ${RESOURCE_PATH}/data/store_processed.csv /app/resources/store.csv
+# COPY ${RESOURCE_PATH}/scalers/scaler.pkl /app/resources/scaler.pkl
+# COPY ${RESOURCE_PATH}/encoders/onehot_encoder.pkl /app/resources/encoder.pkl
+# COPY ${RESOURCE_PATH}/models/lgb_model.pkl /app/resources/sales_model.pkl
+# COPY ${RESOURCE_PATH}/models/ltsm_sales_model.h5 /app/resources/sales_model.h5
 
 # EXPOSE 7777
 # ENV NAME env
@@ -35,3 +37,4 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7777"]
 
 # docker build -t sales-api .
 # docker run -p 7777:7777 sales-api
+# docker build --build-arg RESOURCE_PATH=../resources SCRIPTS_PATH=../scripts -t sales-api .
