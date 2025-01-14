@@ -1,0 +1,26 @@
+# Ignore Python bytecode
+*.pyc
+__pycache__/
+
+# Ignore virtual environments
+env/
+
+# Ignore logs
+*/**.log
+
+# Ignore specific files
+*/**.csv
+*/**.pkl
+*/**.db
+# */**.h5
+
+# Ignore folders
+.github/
+logs/
+mlflow_integration/
+mlruns/
+notebooks/
+resources/
+screenshots/
+src/
+tests/

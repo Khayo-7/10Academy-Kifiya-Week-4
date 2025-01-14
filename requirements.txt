@@ -2,9 +2,17 @@ pandas
 matplotlib
 seaborn
 holiday
+# streamlit
+# shap
+# lime
 xgboost
 lightgbm
-sklearn
 scikit-learn
 tensorflow
 statsmodels
+flask
+flask-cors
+fastapi
+uvicorn
+mlflow
+pyyaml

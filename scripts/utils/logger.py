@@ -1,15 +1,15 @@
 import os
 import logging
 
-def setup_logger(log_file_name, log_dir = "logs"):  
+def setup_logger(log_file_name, log_dir=None):  
     """
     Sets up a logger that writes different log levels to separate files.
     - INFO and higher go to an 'info.log' file.
     - WARNING and higher go to a 'warning.log' file.
     - ERROR and higher go to an 'error.log' file.
     """
-    
-    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'logs')
+    if not log_dir:
+        log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'logs')
 
     # Ensure log directory exists
     os.makedirs(log_dir, exist_ok=True)

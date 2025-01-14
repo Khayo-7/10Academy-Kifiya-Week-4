@@ -158,23 +158,6 @@ def time_series_analysis(data, column, analysis_type, **kwargs):
         plt.show()
     else:
         raise ValueError("Invalid analysis type.")
-    
-def plot_time_series_diagnostics(data, column, diagnostics_type='ACF_PACF', **kwargs):
-    """
-    Plot ACF and PACF for a time series.
-    """
-    logger.info("Plotting time series diagnostics...")
-    if diagnostics_type == 'ACF_PACF':
-        lags = kwargs.get('lags', 40)
-
-        plt.figure(figsize=(15, 7))
-        plt.subplot(211)
-        plot_acf(data[column].dropna(), ax=plt.gca(), lags=lags)
-        plt.subplot(212)
-        plot_pacf(data[column].dropna(), ax=plt.gca(), lags=lags)
-        plt.show()
-    else:
-        raise ValueError("Invalid diagnostics type.")
 
 def plot_distribution(data, column, title=""):
     """
@@ -219,6 +202,20 @@ def plot_sales_heatmap(data, freq='M', figsize=(15, 10)):
     plt.xlabel('Sales')
     plt.show()
 
+def plot_sales_month_week_heatmap(data):
+    logger.info("Plotting sales heatmap by day of week and month...")
+    data = data.copy()
+    data['DayOfWeek'] = data['Date'].dt.dayofweek
+    data['Month'] = data['Date'].dt.month
+    sales_heatmap = data.pivot_table(values='Sales', index='DayOfWeek', columns='Month', aggfunc='mean')
+    
+    plt.figure(figsize=(12, 8))
+    sns.heatmap(sales_heatmap, cmap='YlOrRd', annot=True, fmt='.0f')
+    plt.title('Average Sales by Day of Week and Month')
+    plt.xlabel('Month')
+    plt.ylabel('Day of Week (0=Monday, 6=Sunday)')
+    plt.show()
+    
 def plot_sales(data, column_name, title='Sales Trend Over Time', xlabel='Date', ylabel='Sales', freq='w', figsize=(15, 7)):
     """
     Plots the sales data over time.
@@ -232,7 +229,7 @@ def plot_sales(data, column_name, title='Sales Trend Over Time', xlabel='Date', 
     - figsize (tuple): Size of the figure.
     """
     logger.info("Plotting sales data...")
-    # logging.info("Plotting sales data...")
+    # logger.info("Plotting sales data...")
 
     aggregated_sales = data[column_name].resample(freq).sum()
     
@@ -329,6 +326,23 @@ def seasonal_decomposition(data, column_name, title="Seasonal Decomposition", xl
         plt.show()
     except ValueError:
         print(f"Error: Periodicity mismatch when decomposing {column_name}. Please verify the frequency or the data periodicity.")
+
+def plot_time_series_diagnostics(data, column, diagnostics_type='ACF_PACF', **kwargs):
+    """
+    Plot ACF and PACF for a time series.
+    """
+    logger.info("Plotting time series diagnostics...")
+    if diagnostics_type == 'ACF_PACF':
+        lags = kwargs.get('lags', 40)
+
+        plt.figure(figsize=(15, 7))
+        plt.subplot(211)
+        plot_acf(data[column].dropna(), ax=plt.gca(), lags=lags)
+        plt.subplot(212)
+        plot_pacf(data[column].dropna(), ax=plt.gca(), lags=lags)
+        plt.show()
+    else:
+        raise ValueError("Invalid diagnostics type.")
 
 def plot_ACF_PACF(data, column_name, lags=40, figsize=(15, 10)):
     logger.info("Plotting ACF and PACF...")
@@ -660,6 +674,70 @@ def plot_sales_by_holiday(data, country='US', date_column='Date', sales_column='
     plt.tight_layout()
     plt.show()
 
+def plot_store_type_performance(data):
+    logger.info("Plotting store type performance over time...")
+    data = data.copy()
+    store_type_sales = data.groupby([data['Date'].dt.to_period('M'), 'Store_Type'])['Sales'].mean().unstack()
+    store_type_sales.plot(figsize=(15, 7))
+    plt.title('Monthly Average Sales by Store Type')
+    plt.xlabel('Date')
+    plt.ylabel('Average Sales')
+    plt.legend(title='Store Type')
+    plt.show()
+
+def plot_sales_vs_customers(data):
+    logger.info("Plotting sales vs customers scatter plot...")
+    plt.figure(figsize=(12, 8))
+    scatter = plt.scatter(data['Customers'], data['Sales'], c=data['Date'], cmap='viridis')
+    plt.colorbar(scatter, label='Date')
+    plt.title('Sales vs Customers Over Time')
+    plt.xlabel('Number of Customers')
+    plt.ylabel('Sales')
+    plt.show()
+
+def plot_cumulative_sales(data):
+    logger.info("Plotting cumulative sales over time...")
+    data = data.copy()
+    data['CumulativeSales'] = data['Sales'].cumsum()
+    plt.figure(figsize=(15, 7))
+    plt.plot(data['Date'], data['CumulativeSales'])
+    plt.title('Cumulative Sales Over Time')
+    plt.xlabel('Date')
+    plt.ylabel('Cumulative Sales')
+    plt.show()
+
+def plot_sales_growth_rate(data):
+    logger.info("Plotting daily sales growth rate...")
+    data = data.copy()
+    data['SalesGrowthRate'] = data['Sales'].pct_change()
+    plt.figure(figsize=(15, 7))
+    plt.plot(data['Date'], data['SalesGrowthRate'])
+    plt.title('Daily Sales Growth Rate')
+    plt.xlabel('Date')
+    plt.ylabel('Growth Rate')
+    plt.show()
+
+def correlation_analysis(data):
+    logger.info("Performing correlation analysis...")
+    data = data.copy()
+    data = data.drop(columns=['SalesGrowthRate', 'IsHoliday', 'CumulativeSales'], errors='ignore')
+    numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    correlations = data[numeric_columns].corr()['Sales'].abs().sort_values(ascending=False)
+
+    top_features = correlations[1:11].index.tolist()
+    f_correlation = data[top_features].corr()
+    f_mask = np.triu(np.ones_like(f_correlation, dtype=bool))
+
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(f_correlation, mask=f_mask, annot=True, cmap="coolwarm", vmin=-1, vmax=1, center=0,
+                square=True, linewidths=.5, cbar_kws={"shrink": .5})
+
+    plt.title('Top 10 Features Correlated with Sales', fontsize=16)
+    plt.tight_layout()
+    plt.show()
+
+    logger.info("Correlations with Sales:")
+    logger.info(correlations[top_features])
 
 # Plot Actual vs Predicted
 def plot_actual_vs_predicted(y_true, y_pred, dataset_type="Dataset"):
