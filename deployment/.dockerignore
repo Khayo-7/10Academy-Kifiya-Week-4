@@ -9,8 +9,8 @@ env/
 */**.log
 
 # Ignore specific files
-*/**.csv
-*/**.pkl
+# */**.csv
+# */**.pkl
 */**.db
 # */**.h5
 
