@@ -9,10 +9,11 @@ logger = setup_logger("data_cleaning")
 def clean_data(data, date_column = 'Date'):
     
     data = data.copy()
-    data = format_date_column(data, date_column)
+    data = format_date_column(data, date_column) if date_column in data.columns else data
     data = format_date_column(data, 'CompetitionOpenSince') if 'CompetitionOpenSince' in data.columns else data
     data = data.drop(columns=['Id']) if 'Id' in data.columns else data
-    data ['StateHoliday'] = data['StateHoliday'].astype(str)
+    if 'StateHoliday' in data.columns:
+        data ['StateHoliday'] = data['StateHoliday'].astype(str) 
     data = data.replace([np.inf, -np.inf], np.nan)
 
     return data
