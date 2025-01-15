@@ -1,6 +1,7 @@
 import os
 import sys
 import logging
+import holidays
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -66,6 +67,12 @@ def load_data():
     data = pd.read_csv("data/train_preprocessed.csv")
     return clean_data(data)
 
+# Function to fetch holidays for a country and specific years
+@st.cache_data
+def get_country_holidays(country, years):
+    """Fetch holidays for a specific country and years."""
+    return holidays.CountryHoliday(country, years=years)
+
 data = load_data()
 
 # Cache plotting functions for better performance
@@ -74,12 +81,16 @@ def cached_plot_sales_holidays(data, country):
     return plot_sales_holidays(data, country=country)
 
 @st.cache_data
-def cached_plot_sales_before_during_after_holidays(data, country):
-    return plot_sales_before_during_after_holidays(data, country=country)
-
-@st.cache_data
 def cached_plot_sales_by_holiday(data, country):
     return plot_sales_by_holiday(data, country=country)
+
+@st.cache_data
+def cached_plot_sales_trend_holidays(data, country, holiday_dates=None):
+    return plot_sales_trend_holidays(data, country=country, holiday_dates=holiday_dates)
+
+@st.cache_data
+def cached_plot_sales_before_during_after_holidays(data, country, holiday_dates=None):
+    return plot_sales_before_during_after_holidays(data, country=country, holiday_dates=holiday_dates)
 
 @st.cache_data
 def cached_plot_store_type_performance(data):
@@ -248,16 +259,29 @@ elif selection == "Sales and Holidays":
     st.header("🎉 Sales and Holidays Analysis")
     st.markdown("Explore sales trends before, during, and after specific holidays.")
     
-    country = st.selectbox("Select a country for holiday data:", ['US', 'DE', 'UK', 'ET'], index=0)
-    
+    country = st.selectbox("Select a country for holiday data:", ['US', 'DE', 'UK', 'ET'], index=0)    
+
     st.subheader("Sales on Holidays vs Non-Holidays")
     st.pyplot(cached_plot_sales_holidays(data, country))
 
-    st.subheader("Sales Before, During, and After Holidays")
-    st.pyplot(cached_plot_sales_before_during_after_holidays(data, country))
-
     st.subheader("Sales Per Specific Holidays")
     st.pyplot(cached_plot_sales_by_holiday(data, country))
+    
+    # Select years for holiday analysis
+    unique_years = sorted(data['Date'].dt.year.unique()) 
+    selected_years = st.multiselect("Select years for holiday analysis:", options=unique_years, default=unique_years)
+    country_holidays = get_country_holidays(country, selected_years)
+    holiday_dict = {name: date.strftime('%Y-%m-%d') for date, name in country_holidays.items()}
+    
+    # Select specific holidays
+    selected_holidays = st.multiselect("Select specific holidays to analyze:", options=list(holiday_dict.keys()),default=list(holiday_dict.keys()))
+    holiday_dates = [holiday_dict[holiday] for holiday in selected_holidays]
+
+    st.subheader("Sales trend On Holidays")
+    st.pyplot(cached_plot_sales_trend_holidays(data, country=country, holiday_dates=holiday_dates))
+
+    st.subheader("Sales Before, During, and After Holidays")
+    st.pyplot(cached_plot_sales_before_during_after_holidays(data, country, holiday_dates=holiday_dates))
 
 # Store Performance Section
 elif selection == "Store Performance":

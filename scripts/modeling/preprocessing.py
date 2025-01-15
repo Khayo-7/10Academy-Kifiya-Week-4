@@ -268,6 +268,6 @@ def preprocess_datasets(train, test, store, method='label', group_by='Store'):
 
     # Save Encoders and Scaler models for a later use in deployment
     joblib.dump(scaler, os.path.join(scaler_path, "scaler.pkl"))
-    joblib.dump(label_encoders, os.path.join(encoder_path, f"{method}_encoders.pkl"))
+    joblib.dump(label_encoders, os.path.join(encoder_path, f"{method}_encoder.pkl"))
 
     return train_preprocessed, test_preprocessed, store_processed, scaler, label_encoders
