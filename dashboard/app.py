@@ -259,7 +259,8 @@ elif selection == "Sales and Holidays":
     st.header("🎉 Sales and Holidays Analysis")
     st.markdown("Explore sales trends before, during, and after specific holidays.")
     
-    country = st.selectbox("Select a country for holiday data:", ['US', 'DE', 'UK', 'ET'], index=0)    
+    country = st.selectbox("Select a country for holiday data:", ['US', 'DE', 'UK', 'ET'], index=0)
+    unique_years = sorted(data['Date'].dt.year.unique())     
 
     st.subheader("Sales on Holidays vs Non-Holidays")
     st.pyplot(cached_plot_sales_holidays(data, country))
@@ -268,7 +269,6 @@ elif selection == "Sales and Holidays":
     st.pyplot(cached_plot_sales_by_holiday(data, country))
     
     # Select years for holiday analysis
-    unique_years = sorted(data['Date'].dt.year.unique()) 
     selected_years = st.multiselect("Select years for holiday analysis:", options=unique_years, default=unique_years)
     country_holidays = get_country_holidays(country, selected_years)
     holiday_dict = {name: date.strftime('%Y-%m-%d') for date, name in country_holidays.items()}
@@ -279,6 +279,15 @@ elif selection == "Sales and Holidays":
 
     st.subheader("Sales trend On Holidays")
     st.pyplot(cached_plot_sales_trend_holidays(data, country=country, holiday_dates=holiday_dates))
+
+    # # Select years for holiday analysis
+    selected_years = st.multiselect("Select years for holiday analysis:", options=unique_years, default=unique_years)
+    country_holidays = get_country_holidays(country, selected_years)
+    holiday_dict = {name: date.strftime('%Y-%m-%d') for date, name in country_holidays.items()}
+    
+    # Select specific holidays
+    selected_holidays = st.multiselect("Select specific holidays to analyze:", options=list(holiday_dict.keys()),default=list(holiday_dict.keys()))
+    holiday_dates = [holiday_dict[holiday] for holiday in selected_holidays]
 
     st.subheader("Sales Before, During, and After Holidays")
     st.pyplot(cached_plot_sales_before_during_after_holidays(data, country, holiday_dates=holiday_dates))
