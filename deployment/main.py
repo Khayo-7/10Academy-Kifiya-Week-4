@@ -1,21 +1,24 @@
 import os
 import sys
+import logging
 import pandas as pd
 from flask_cors import CORS
 from flask import Flask, request, jsonify
 from app.prediction import make_prediction
 from app.schemas import SalesPredictionInput, SalesPredictionOutput
 
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+
 try:
     from scripts.utils.logger import setup_logger
-except:
-    sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+except ImportError as e:
+    logging(f"Import error: {e}. Please check the module path.")
 
-finally:
-    from scripts.utils.logger import setup_logger
 # Setup logger for deployement
 log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 logger = setup_logger("flask_deployement", log_dir)
+
+logger.info("Starting process...")
 
 # Initialize Flask app
 app = Flask(__name__)

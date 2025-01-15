@@ -1,0 +1,25 @@
+version: "3.8"
+services:
+  flask:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile
+    command: python app/flask_app.py
+    ports:
+      - "7777:7777"
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile
+    command: uvicorn app.fastapi_app:app --host 0.0.0.0 --port 7777
+    ports:
+      - "8888:8888"
+
+  streamlit:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile
+    command: streamlit run /app/dashboard/streamlit_app.py --server.port 9999
+    ports:
+      - "9999:9999"

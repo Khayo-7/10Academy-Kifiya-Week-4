@@ -1,0 +1,29 @@
+# Ignore Python bytecode
+*.pyc
+*/__pycache__
+
+# Ignore virtual environments
+env/
+
+# Ignore logs
+*/**.log
+
+# Ignore specific files
+# */**.csv
+# */**.pkl
+# */**.h5
+*/**.db
+
+# Ignore folders
+.git
+.github
+logs
+mlflow_integration
+mlruns
+notebooks
+screenshots
+src
+tests
+deployment/resources
+scripts/utils/visualizations.py
+resources/data/rf_model.pkl
